@@ -24,6 +24,7 @@ class SettingsRepository(private val context: Context) {
         private val OPENAI_API_KEY = stringPreferencesKey("openai_api_key")
         private val MCP_SERVERS = stringPreferencesKey("mcp_servers")
         private val THINGS5_CONFIG = stringPreferencesKey("things5_config")
+        private val MCP_TOOLS_CONFIG = stringPreferencesKey("mcp_tools_config")
         private val IS_CONFIGURED = booleanPreferencesKey("is_configured")
     }
     
@@ -53,10 +54,19 @@ class SettingsRepository(private val context: Context) {
         Log.d(TAG, "   Username: ${things5Config.username}")
         Log.d(TAG, "   Password: [${things5Config.password.length} chars]")
         
+        val toolsConfigJson = preferences[MCP_TOOLS_CONFIG] ?: "{}"
+        val toolsConfig = try {
+            gson.fromJson(toolsConfigJson, McpToolsConfiguration::class.java) ?: McpToolsConfiguration()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing MCP tools config", e)
+            McpToolsConfiguration()
+        }
+        
         AppSettings(
             openAiApiKey = preferences[OPENAI_API_KEY] ?: "",
             mcpServers = mcpServers,
             things5Config = things5Config,
+            mcpToolsConfig = toolsConfig,
             isConfigured = preferences[IS_CONFIGURED] ?: false
         )
     }
@@ -75,6 +85,7 @@ class SettingsRepository(private val context: Context) {
             preferences[OPENAI_API_KEY] = settings.openAiApiKey
             preferences[MCP_SERVERS] = gson.toJson(settings.mcpServers)
             preferences[THINGS5_CONFIG] = things5Json
+            preferences[MCP_TOOLS_CONFIG] = gson.toJson(settings.mcpToolsConfig)
             preferences[IS_CONFIGURED] = settings.isConfigured
         }
         
@@ -168,5 +179,78 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[IS_CONFIGURED] = configured
         }
+    }
+    
+    /**
+     * Update tool configuration for a specific server
+     */
+    suspend fun updateToolsConfig(toolsConfig: McpToolsConfiguration) {
+        context.dataStore.edit { preferences ->
+            preferences[MCP_TOOLS_CONFIG] = gson.toJson(toolsConfig)
+        }
+        Log.d(TAG, "✅ Tools configuration updated")
+    }
+    
+    /**
+     * Toggle tool enabled/disabled
+     */
+    suspend fun toggleTool(serverName: String, toolName: String) {
+        context.dataStore.edit { preferences ->
+            val currentConfigJson = preferences[MCP_TOOLS_CONFIG] ?: "{}"
+            val currentConfig = try {
+                gson.fromJson(currentConfigJson, McpToolsConfiguration::class.java) ?: McpToolsConfiguration()
+            } catch (e: Exception) {
+                McpToolsConfiguration()
+            }
+            
+            val serverTools = currentConfig.tools[serverName]?.toMutableList() ?: mutableListOf()
+            val toolIndex = serverTools.indexOfFirst { it.toolName == toolName }
+            
+            if (toolIndex >= 0) {
+                // Toggle existing config
+                serverTools[toolIndex] = serverTools[toolIndex].copy(enabled = !serverTools[toolIndex].enabled)
+            } else {
+                // Create new config (disabled by default when toggling first time)
+                serverTools.add(McpToolConfig(serverName, toolName, enabled = false))
+            }
+            
+            val updatedTools = currentConfig.tools.toMutableMap()
+            updatedTools[serverName] = serverTools
+            
+            val updatedConfig = currentConfig.copy(tools = updatedTools)
+            preferences[MCP_TOOLS_CONFIG] = gson.toJson(updatedConfig)
+        }
+    }
+    
+    /**
+     * Update tool custom description
+     */
+    suspend fun updateToolDescription(serverName: String, toolName: String, description: String?) {
+        context.dataStore.edit { preferences ->
+            val currentConfigJson = preferences[MCP_TOOLS_CONFIG] ?: "{}"
+            val currentConfig = try {
+                gson.fromJson(currentConfigJson, McpToolsConfiguration::class.java) ?: McpToolsConfiguration()
+            } catch (e: Exception) {
+                McpToolsConfiguration()
+            }
+            
+            val serverTools = currentConfig.tools[serverName]?.toMutableList() ?: mutableListOf()
+            val toolIndex = serverTools.indexOfFirst { it.toolName == toolName }
+            
+            if (toolIndex >= 0) {
+                // Update existing config
+                serverTools[toolIndex] = serverTools[toolIndex].copy(customDescription = description)
+            } else {
+                // Create new config with custom description
+                serverTools.add(McpToolConfig(serverName, toolName, enabled = true, customDescription = description))
+            }
+            
+            val updatedTools = currentConfig.tools.toMutableMap()
+            updatedTools[serverName] = serverTools
+            
+            val updatedConfig = currentConfig.copy(tools = updatedTools)
+            preferences[MCP_TOOLS_CONFIG] = gson.toJson(updatedConfig)
+        }
+        Log.d(TAG, "✅ Tool description updated for $toolName")
     }
 }

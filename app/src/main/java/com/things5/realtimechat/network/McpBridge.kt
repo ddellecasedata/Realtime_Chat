@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.things5.realtimechat.data.McpAuthType
 import com.things5.realtimechat.data.McpServerConfig
+import com.things5.realtimechat.data.McpToolsConfiguration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,6 +74,9 @@ class McpBridge(
     private val _serverStatus = MutableStateFlow<Map<String, McpServerStatus>>(emptyMap())
     // Exposed state flow
     val serverStatus: StateFlow<Map<String, McpServerStatus>> = _serverStatus.asStateFlow()
+    
+    // Tool configuration (enabled/disabled, custom descriptions)
+    private var toolsConfiguration: McpToolsConfiguration = McpToolsConfiguration()
     
     /**
      * Build URL for initial HTTP requests, appending no_auth=true when auth is NONE
@@ -1091,25 +1095,67 @@ class McpBridge(
     }
     
     /**
+     * Set tool configuration
+     */
+    fun setToolsConfiguration(config: McpToolsConfiguration) {
+        toolsConfiguration = config
+        Log.d(TAG, "📋 Tool configuration updated: ${config.tools.values.flatten().size} total tool configs")
+    }
+    
+    /**
+     * Get tools for a specific server
+     */
+    fun getServerTools(serverName: String): List<McpTool> {
+        return availableTools[serverName] ?: emptyList()
+    }
+    
+    /**
+     * Get all connected server names
+     */
+    fun getConnectedServers(): List<String> {
+        return availableTools.keys.toList()
+    }
+    
+    /**
      * Ottieni tutti i tools disponibili da tutti i server
      * Formattato per OpenAI Realtime API
-     * Filters out tools with invalid schemas
+     * Filters out tools with invalid schemas and applies tool configuration
      */
     fun getAllTools(): List<Map<String, Any>> {
         val allTools = mutableListOf<Map<String, Any>>()
         var validCount = 0
         var invalidCount = 0
+        var disabledCount = 0
         
         for ((serverName, tools) in availableTools) {
+            val serverToolConfigs = toolsConfiguration.tools[serverName] ?: emptyList()
+            
             tools.forEach { tool ->
+                // Check if tool is enabled (default true if no config)
+                val toolConfig = serverToolConfigs.firstOrNull { config -> config.toolName == tool.name }
+                val isEnabled = toolConfig?.enabled ?: true
+                
+                if (!isEnabled) {
+                    Log.d(TAG, "🔕 Skipping disabled tool: ${tool.name} from $serverName")
+                    disabledCount++
+                    return@forEach
+                }
+                
                 if (isValidToolSchema(tool)) {
+                    // Use custom description if available, otherwise use original
+                    val description = toolConfig?.customDescription ?: tool.description
+                    
                     allTools.add(mapOf(
                         "type" to "function",
                         "name" to tool.name,
-                        "description" to tool.description,
+                        "description" to description,
                         "parameters" to (tool.parameters ?: JsonObject())
                     ))
                     validCount++
+                    
+                    if (toolConfig?.customDescription != null) {
+                        Log.d(TAG, "✏️ Using custom description for ${tool.name}")
+                    }
                 } else {
                     Log.w(TAG, "❌ Skipping tool '${tool.name}' from '$serverName' due to invalid schema")
                     invalidCount++
@@ -1117,8 +1163,8 @@ class McpBridge(
             }
         }
         
-        if (invalidCount > 0) {
-            Log.w(TAG, "⚠️ Filtered out $invalidCount invalid tools, returning $validCount valid tools")
+        if (invalidCount > 0 || disabledCount > 0) {
+            Log.w(TAG, "⚠️ Filtered out $invalidCount invalid + $disabledCount disabled tools, returning $validCount valid enabled tools")
         }
         
         return allTools

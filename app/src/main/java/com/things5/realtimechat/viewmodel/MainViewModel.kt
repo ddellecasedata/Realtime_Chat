@@ -25,7 +25,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -91,6 +93,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Build structured prompt following realtime model best practices
      */
     private fun buildRealtimePrompt(): String {
+        // Get available tools from MCP Bridge
+        val tools = mcpBridge?.getAllTools() ?: emptyList()
+        
+        val toolsSection = if (tools.isNotEmpty()) {
+            val toolsList = tools.joinToString("\n") { tool ->
+                val name = tool["name"] ?: "unknown"
+                val description = tool["description"] ?: "No description"
+                "  - $name: $description"
+            }
+            
+            """
+            ## Available Tools
+            You have access to the following tools:
+            $toolsList
+            
+            ## Using Tools
+            - When you need to use a tool, briefly tell the user what you're doing.
+            - Sample preambles (vary):
+              - "Controllo subito."
+              - "Verifico per te."
+              - "Un attimo, cerco l'informazione."
+            - Then immediately call the appropriate tool.
+            - Use the tool description to understand when to use it.
+            """.trimIndent()
+        } else {
+            """
+            # Tools
+            - When you need to use a tool, briefly tell the user what you're doing.
+            - Sample preambles (vary):
+              - "Controllo subito."
+              - "Verifico per te."
+              - "Un attimo, cerco l'informazione."
+            - Then immediately call the tool.
+            """.trimIndent()
+        }
+        
         return """
             # Role & Objective
             You are a helpful, intelligent voice assistant for a mobile app.
@@ -123,13 +161,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
               - "C'è del rumore di fondo. Ripeti l'ultima parte."
               - "Ho sentito solo una parte. Cosa hai detto dopo ___?"
             
-            # Tools
-            - When you need to use a tool, briefly tell the user what you're doing.
-            - Sample preambles (vary):
-              - "Controllo subito."
-              - "Verifico per te."
-              - "Un attimo, cerco l'informazione."
-            - Then immediately call the tool.
+            $toolsSection
             
             # Instructions
             - Be natural and conversational.
@@ -468,11 +500,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
             
+            // Passa la configurazione tool al bridge
+            viewModelScope.launch {
+                val settings = settingsRepository.settingsFlow.first()
+                mcpBridge?.setToolsConfiguration(settings.mcpToolsConfig)
+                Log.d(TAG, "Tools configuration applied to MCP Bridge")
+            }
+            
             // Connetti ai server MCP
             mcpBridge?.connectToServers()
             
             // Observe MCP server status
             observeMcpStatus()
+            
+            // Observe tool configuration changes
+            observeToolConfigChanges()
             
             Log.d(TAG, "MCP Bridge initialized")
         } catch (e: Exception) {
@@ -490,6 +532,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _mcpServerStatus.value = status
                 Log.d(TAG, "MCP Status updated: ${status.keys}")
             }
+        }
+    }
+    
+    /**
+     * Observe tool configuration changes and update MCP Bridge
+     */
+    private fun observeToolConfigChanges() {
+        viewModelScope.launch {
+            settingsRepository.settingsFlow
+                .map { it.mcpToolsConfig }
+                .distinctUntilChanged()
+                .collect { toolsConfig ->
+                    Log.d(TAG, "🔧 Tool configuration changed, updating MCP Bridge...")
+                    mcpBridge?.setToolsConfiguration(toolsConfig)
+                }
         }
     }
     
@@ -719,14 +776,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     is RealtimeEvent.Error -> {
-                        Log.e(TAG, "❌ Realtime API error: ${event.message}")
-                        incrementDebugCounter(errors = 1)
-                        addDebugLog(DebugLogType.ERROR, "Errore API", event.message)
-                        val limit = event.message.contains("rate limit", ignoreCase = true) ||
-                                event.message.contains("quota", ignoreCase = true) ||
-                                event.message.contains("limit", ignoreCase = true)
-                        updateDebugState(lastError = event.message, usageLimitReached = limit)
-                        updateState(errorMessage = "API Error: ${event.message}")
+                        // Ignora errori benigni di cancellazione (risposta già completata)
+                        val isBenignCancellationError = event.message.contains("Cancellation failed", ignoreCase = true) &&
+                                event.message.contains("no active response", ignoreCase = true)
+                        
+                        if (isBenignCancellationError) {
+                            Log.d(TAG, "⚠️ Cancellation error (response already completed): ${event.message}")
+                            // Non incrementare il contatore errori per questo
+                        } else {
+                            Log.e(TAG, "❌ Realtime API error: ${event.message}")
+                            incrementDebugCounter(errors = 1)
+                            addDebugLog(DebugLogType.ERROR, "Errore API", event.message)
+                        }
+                        
+                        // Non mostrare errore nell'UI per cancellazioni benigne
+                        if (!isBenignCancellationError) {
+                            val limit = event.message.contains("rate limit", ignoreCase = true) ||
+                                    event.message.contains("quota", ignoreCase = true) ||
+                                    event.message.contains("limit", ignoreCase = true)
+                            updateDebugState(lastError = event.message, usageLimitReached = limit)
+                            updateState(errorMessage = "API Error: ${event.message}")
+                        }
                     }
                     else -> {
                         // Handle other events
@@ -799,6 +869,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearDebugLogs() {
         updateDebugState(logs = emptyList())
         addDebugLog(DebugLogType.INFO, "Log cancellati")
+    }
+    
+    /**
+     * Get MCP Bridge instance (for external access)
+     */
+    fun getMcpBridge(): McpBridge? {
+        return mcpBridge
     }
     
     /**

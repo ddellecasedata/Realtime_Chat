@@ -8,18 +8,21 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -35,6 +38,7 @@ import com.things5.realtimechat.viewmodel.AdminViewModel
 fun AdminScreen(
     onNavigateBack: () -> Unit,
     onNavigateToMcpDebug: (String) -> Unit,
+    onNavigateToMcpTools: (String) -> Unit,
     onNavigateToRealtimeDebug: () -> Unit,
     viewModel: AdminViewModel = viewModel()
 ) {
@@ -246,6 +250,7 @@ fun AdminScreen(
                     server = server,
                     onToggle = { viewModel.toggleMcpServer(server.name) },
                     onDelete = { viewModel.removeMcpServer(server.name) },
+                    onManageTools = { onNavigateToMcpTools(server.name) },
                     onClick = { onNavigateToMcpDebug(server.name) }
                 )
             }
@@ -321,51 +326,88 @@ fun McpServerCard(
     server: McpServerConfig,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
+    onManageTools: () -> Unit,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = server.name,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = server.url,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
+            // Main row with server info and switch
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Switch(
-                    checked = server.enabled,
-                    onCheckedChange = { onToggle() }
-                )
-                
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        "Elimina",
-                        tint = MaterialTheme.colorScheme.error
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = server.name,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        text = server.url,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Switch(
+                        checked = server.enabled,
+                        onCheckedChange = { onToggle() }
+                    )
+                    
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            "Elimina",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+            
+            // Manage tools button
+            HorizontalDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onManageTools)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Build,
+                    contentDescription = "Gestisci tool",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Gestisci Tool",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -61,6 +61,7 @@ data class AppSettings(
     val openAiApiKey: String = "",
     val mcpServers: List<McpServerConfig> = emptyList(),
     val things5Config: Things5Config = Things5Config(),
+    val mcpToolsConfig: McpToolsConfiguration = McpToolsConfiguration(),
     val isConfigured: Boolean = false
 )
 
@@ -169,3 +170,22 @@ enum class ConnectionQuality {
     POOR,
     UNKNOWN
 }
+
+/**
+ * Configuration for a single MCP tool
+ */
+@Immutable
+data class McpToolConfig(
+    val serverName: String,           // Nome del server MCP di appartenenza
+    val toolName: String,             // Nome del tool (identificatore univoco)
+    val enabled: Boolean = true,      // Tool attivo/disattivo
+    val customDescription: String? = null  // Descrizione personalizzata (null = usa quella originale)
+)
+
+/**
+ * Tool configurations stored per server
+ */
+@Immutable
+data class McpToolsConfiguration(
+    val tools: Map<String, List<McpToolConfig>> = emptyMap() // serverName -> lista config tool
+)

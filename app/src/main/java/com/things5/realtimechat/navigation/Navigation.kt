@@ -12,14 +12,19 @@ import androidx.navigation.navArgument
 import com.things5.realtimechat.ui.screens.AdminScreen
 import com.things5.realtimechat.ui.screens.MainScreen
 import com.things5.realtimechat.ui.screens.McpDebugScreen
+import com.things5.realtimechat.ui.screens.McpToolsScreen
 import com.things5.realtimechat.ui.screens.RealtimeDebugScreen
 import com.things5.realtimechat.viewmodel.MainViewModel
+import com.things5.realtimechat.viewmodel.McpToolsViewModel
 
 sealed class Screen(val route: String) {
     object Main : Screen("main")
     object Admin : Screen("admin")
     object McpDebug : Screen("mcp_debug/{serverName}") {
         fun createRoute(serverName: String) = "mcp_debug/$serverName"
+    }
+    object McpTools : Screen("mcp_tools/{serverName}") {
+        fun createRoute(serverName: String) = "mcp_tools/$serverName"
     }
     object RealtimeDebug : Screen("realtime_debug")
 }
@@ -50,6 +55,9 @@ fun AppNavigation() {
                 onNavigateToMcpDebug = { serverName ->
                     navController.navigate(Screen.McpDebug.createRoute(serverName))
                 },
+                onNavigateToMcpTools = { serverName ->
+                    navController.navigate(Screen.McpTools.createRoute(serverName))
+                },
                 onNavigateToRealtimeDebug = {
                     navController.navigate(Screen.RealtimeDebug.route)
                 }
@@ -77,6 +85,30 @@ fun AppNavigation() {
                 },
                 onRefresh = {
                     // Refresh is handled by the viewmodel collecting the status
+                }
+            )
+        }
+        
+        composable(
+            route = Screen.McpTools.route,
+            arguments = listOf(
+                navArgument("serverName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val serverName = backStackEntry.arguments?.getString("serverName") ?: ""
+            
+            // Create McpToolsViewModel with dependencies
+            val toolsViewModel = McpToolsViewModel(
+                application = mainViewModel.getApplication(),
+                serverName = serverName,
+                mcpBridge = mainViewModel.getMcpBridge()
+            )
+            
+            McpToolsScreen(
+                viewModel = toolsViewModel,
+                serverName = serverName,
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
