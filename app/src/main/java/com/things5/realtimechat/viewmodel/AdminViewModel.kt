@@ -118,10 +118,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun updateThings5Credentials(username: String, password: String) {
-        Log.d(TAG, "🔧 Updating Things5 credentials:")
-        Log.d(TAG, "   Username: $username")
-        Log.d(TAG, "   Password: [${password.length} chars]")
-        
+        // Only update local state, don't save to DataStore yet
+        // This prevents triggering settings flow on every keystroke
         val currentConfig = _settings.value.things5Config
         val updatedConfig = currentConfig.copy(
             username = username,
@@ -129,17 +127,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         )
         _settings.value = _settings.value.copy(things5Config = updatedConfig)
         
-        Log.d(TAG, "✅ Credentials updated in local state")
-        
-        // Save credentials immediately to DataStore
-        viewModelScope.launch {
-            try {
-                settingsRepository.updateThings5Credentials(username, password)
-                Log.d(TAG, "💾 Credentials saved to DataStore immediately")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to save credentials to DataStore", e)
-            }
-        }
+        // Credentials will be saved when user clicks "Salva" button
     }
     
     fun updateThings5ServerUrl(serverUrl: String) {
