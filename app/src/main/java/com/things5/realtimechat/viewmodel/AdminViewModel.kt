@@ -33,11 +33,23 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _isTestingThings5 = MutableStateFlow(false)
     val isTestingThings5: StateFlow<Boolean> = _isTestingThings5.asStateFlow()
     
-    // Expose Things5 connection status
-    val things5ConnectionStatus: StateFlow<Things5ConnectionStatus> = things5AuthService.connectionStatus
+    // Things5 connection status - combines service status and persisted status
+    private val _things5ConnectionStatus = MutableStateFlow(Things5ConnectionStatus.DISCONNECTED)
+    val things5ConnectionStatus: StateFlow<Things5ConnectionStatus> = _things5ConnectionStatus.asStateFlow()
     
     init {
         loadSettings()
+        
+        // Observe service connection status changes (from test connection, etc.)
+        viewModelScope.launch {
+            things5AuthService.connectionStatus.collect { serviceStatus ->
+                // Update our status, but only if it's not DISCONNECTED 
+                // (to avoid resetting the persisted CONNECTED status on init)
+                if (serviceStatus != Things5ConnectionStatus.DISCONNECTED) {
+                    _things5ConnectionStatus.value = serviceStatus
+                }
+            }
+        }
     }
     
     private fun loadSettings() {
@@ -48,7 +60,12 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 Log.d(TAG, "   Things5 URL: ${settings.things5Config.serverUrl}")
                 Log.d(TAG, "   Things5 username: ${settings.things5Config.username}")
                 Log.d(TAG, "   Things5 password: [${settings.things5Config.password.length} chars]")
+                Log.d(TAG, "   Things5 status from DataStore: ${settings.things5Config.connectionStatus}")
+                
                 _settings.value = settings
+                
+                // Sync connection status from persisted settings
+                _things5ConnectionStatus.value = settings.things5Config.connectionStatus
             }
         }
     }
