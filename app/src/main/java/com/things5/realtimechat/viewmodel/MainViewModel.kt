@@ -41,13 +41,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val things5AuthService = Things5AuthService()
     
     init {
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "🚀 MainViewModel INIT - Starting up...")
+        Log.d(TAG, "═══════════════════════════════════════════")
+        
         // Initialize Things5 authentication at startup if enabled
         viewModelScope.launch {
             try {
+                Log.d(TAG, "📥 Fetching settings from repository...")
                 val settings = settingsRepository.settingsFlow.first()
+                
+                Log.d(TAG, "📥 Settings received:")
+                Log.d(TAG, "   Things5 enabled: ${settings.things5Config.enabled}")
+                Log.d(TAG, "   Things5 username: ${settings.things5Config.username}")
+                Log.d(TAG, "   Things5 password: [${settings.things5Config.password.length} chars]")
+                Log.d(TAG, "   Things5 status: ${settings.things5Config.connectionStatus}")
+                
                 initializeThings5Authentication(settings)
             } catch (e: Exception) {
-                Log.e(TAG, "Error during Things5 startup authentication", e)
+                Log.e(TAG, "❌ Error during Things5 startup authentication", e)
             }
         }
         
@@ -83,11 +95,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Initialize or re-initialize Things5 authentication
      */
     private suspend fun initializeThings5Authentication(settings: AppSettings) {
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "🔐 initializeThings5Authentication() called")
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "   Enabled: ${settings.things5Config.enabled}")
+        Log.d(TAG, "   Username empty: ${settings.things5Config.username.isEmpty()}")
+        Log.d(TAG, "   Password empty: ${settings.things5Config.password.isEmpty()}")
+        
         if (settings.things5Config.enabled && 
             settings.things5Config.username.isNotEmpty() && 
             settings.things5Config.password.isNotEmpty()) {
             
-            Log.d(TAG, "🚀 Initializing Things5 authentication...")
+            Log.d(TAG, "✅ Things5 credentials present, authenticating...")
             Log.d(TAG, "   URL: ${settings.things5Config.serverUrl}")
             Log.d(TAG, "   Username: ${settings.things5Config.username}")
             

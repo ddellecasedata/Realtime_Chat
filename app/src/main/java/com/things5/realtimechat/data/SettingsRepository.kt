@@ -29,6 +29,11 @@ class SettingsRepository(private val context: Context) {
     }
     
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { preferences ->
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "📖 LOADING SETTINGS FROM DATASTORE")
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "All preference keys: ${preferences.asMap().keys}")
+        
         val mcpServersJson = preferences[MCP_SERVERS] ?: "[]"
         val mcpServers = try {
             val type = object : TypeToken<List<McpServerConfig>>() {}.type
@@ -39,7 +44,10 @@ class SettingsRepository(private val context: Context) {
         }
         
         val things5ConfigJson = preferences[THINGS5_CONFIG] ?: "{}"
-        Log.d(TAG, "📖 Loading Things5 config from DataStore: $things5ConfigJson")
+        Log.d(TAG, "📖 Things5Config RAW from DataStore:")
+        Log.d(TAG, "   Key exists: ${preferences.contains(THINGS5_CONFIG)}")
+        Log.d(TAG, "   JSON value: '$things5ConfigJson'")
+        Log.d(TAG, "   JSON length: ${things5ConfigJson.length}")
         
         val things5Config = try {
             gson.fromJson(things5ConfigJson, Things5Config::class.java) ?: Things5Config()
@@ -48,11 +56,14 @@ class SettingsRepository(private val context: Context) {
             Things5Config()
         }
         
-        Log.d(TAG, "📖 Loaded Things5 config:")
+        Log.d(TAG, "📖 Things5 config PARSED:")
         Log.d(TAG, "   Enabled: ${things5Config.enabled}")
         Log.d(TAG, "   URL: ${things5Config.serverUrl}")
         Log.d(TAG, "   Username: ${things5Config.username}")
         Log.d(TAG, "   Password: [${things5Config.password.length} chars]")
+        Log.d(TAG, "   Status: ${things5Config.connectionStatus}")
+        Log.d(TAG, "   Last success: ${things5Config.lastSuccessfulConnection}")
+        Log.d(TAG, "═══════════════════════════════════════════")
         
         val toolsConfigJson = preferences[MCP_TOOLS_CONFIG] ?: "{}"
         val toolsConfig = try {
@@ -74,12 +85,16 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveSettings(settings: AppSettings) {
         val things5Json = gson.toJson(settings.things5Config)
         
-        Log.d(TAG, "💾 Saving settings to DataStore:")
+        Log.d(TAG, "═══════════════════════════════════════════")
+        Log.d(TAG, "💾 SAVING SETTINGS TO DATASTORE")
+        Log.d(TAG, "═══════════════════════════════════════════")
         Log.d(TAG, "   Things5 enabled: ${settings.things5Config.enabled}")
         Log.d(TAG, "   Things5 URL: ${settings.things5Config.serverUrl}")
         Log.d(TAG, "   Things5 username: ${settings.things5Config.username}")
         Log.d(TAG, "   Things5 password: [${settings.things5Config.password.length} chars]")
-        Log.d(TAG, "   Things5 JSON: $things5Json")
+        Log.d(TAG, "   Things5 status: ${settings.things5Config.connectionStatus}")
+        Log.d(TAG, "   Things5 JSON to save: '$things5Json'")
+        Log.d(TAG, "   Things5 JSON length: ${things5Json.length}")
         
         context.dataStore.edit { preferences ->
             preferences[OPENAI_API_KEY] = settings.openAiApiKey
@@ -87,9 +102,19 @@ class SettingsRepository(private val context: Context) {
             preferences[THINGS5_CONFIG] = things5Json
             preferences[MCP_TOOLS_CONFIG] = gson.toJson(settings.mcpToolsConfig)
             preferences[IS_CONFIGURED] = settings.isConfigured
+            
+            Log.d(TAG, "   ✍️ Written to preferences[THINGS5_CONFIG]")
         }
         
-        Log.d(TAG, "✅ Settings saved to DataStore")
+        // Verify write
+        context.dataStore.data.map { prefs ->
+            val saved = prefs[THINGS5_CONFIG]
+            Log.d(TAG, "   🔍 Verification read: '$saved'")
+            Log.d(TAG, "   Match: ${saved == things5Json}")
+        }
+        
+        Log.d(TAG, "✅ Settings save completed")
+        Log.d(TAG, "═══════════════════════════════════════════")
     }
     
     suspend fun updateApiKey(apiKey: String) {
