@@ -282,6 +282,18 @@ class RealtimeClient(
     }
     
     /**
+     * Clear the input audio buffer on the server
+     * Useful to drop any stale audio when barge-in occurs or before ending session
+     */
+    fun clearInputBuffer() {
+        Log.d(TAG, "🧹 Clearing input audio buffer on server...")
+        val event = mapOf(
+            "type" to "input_audio_buffer.clear"
+        )
+        sendEvent(event)
+    }
+    
+    /**
      * Send an image in the conversation
      * Format: data URL with base64 encoded image
      */

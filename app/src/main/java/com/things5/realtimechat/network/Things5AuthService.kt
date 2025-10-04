@@ -245,8 +245,9 @@ class Things5AuthService {
         val baseUrl = config.serverUrl
         val separator = if (baseUrl.contains('?')) '&' else '?'
         
-        val finalUrl = "${baseUrl}${separator}username=${URLEncoder.encode(config.username, "UTF-8")}" +
-                "&password=${URLEncoder.encode(config.password, "UTF-8")}"
+        fun enc(v: String): String = URLEncoder.encode(v, "UTF-8").replace("+", "%20")
+        val finalUrl = "${baseUrl}${separator}username=${enc(config.username)}" +
+                "&password=${enc(config.password)}"
         
         Log.d(TAG, "Built MCP URL: $finalUrl")
         Log.d(TAG, "Base URL: $baseUrl")
@@ -293,10 +294,9 @@ class Things5AuthService {
      * Check if credentials are valid format
      */
     fun validateCredentials(username: String, password: String): Boolean {
-        return username.isNotEmpty() && 
-               username.contains("@") && 
-               password.isNotEmpty() && 
-               password.length >= 6
+        // Simple but effective email regex, case-insensitive
+        val emailRegex = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
+        return emailRegex.matches(username) && password.length >= 6
     }
     
     /**

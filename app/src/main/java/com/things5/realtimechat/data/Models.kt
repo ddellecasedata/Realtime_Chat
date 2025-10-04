@@ -34,7 +34,7 @@ data class McpServerConfig(
 @Immutable
 data class Things5Config(
     val enabled: Boolean = false,
-    val serverUrl: String = "https://things5-mcp-server.onrender.com/mcp",
+    val serverUrl: String = "https://things5-mcp-server.onrender.com/sse",
     val username: String = "",
     val password: String = "",
     val connectionStatus: Things5ConnectionStatus = Things5ConnectionStatus.DISCONNECTED,

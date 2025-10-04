@@ -7,6 +7,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Comprehensive tests for Things5 integration
@@ -18,6 +21,8 @@ import org.junit.Assert.*
  * - Connection status handling
  * - Error scenarios
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE)
 class Things5IntegrationTest {
     
     private lateinit var authService: Things5AuthService

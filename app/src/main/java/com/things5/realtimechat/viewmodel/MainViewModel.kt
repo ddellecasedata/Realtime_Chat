@@ -148,6 +148,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
               - "Controllo subito."
               - "Verifico per te."
               - "Un attimo, cerco l'informazione."
+            - Immediately after the user finishes speaking, say a very short preamble (max 3 words) and start the tool call.
+              - Examples: "Controllo subito", "Un attimo, verifico", "Sto cercando"
+              - Keep it ultra-short so it plays before the user speaks again.
             - Then immediately call the appropriate tool.
             - Use the tool description to understand when to use it.
             
@@ -923,6 +926,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             Log.d(TAG, "⏯️ Auto-interrupting assistant - user is speaking")
                             audioManager.stopPlayback()
                             realtimeClient?.cancelResponse()
+                            // Pulisce il buffer di input lato server per evitare residui
+                            realtimeClient?.clearInputBuffer()
                             isAssistantSpeaking = false
                         }
                     }
@@ -1138,6 +1143,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             toolCallsExecuted = _debugState.value.toolCallsExecuted + toolCallsExecuted,
             errors = _debugState.value.errors + errors
         )
+    }
+    
+    /**
+     * End the realtime session immediately (user pressed Stop)
+     * - Stops any ongoing assistant audio
+     * - Cancels current response generation on the server
+     * - Disconnects the websocket
+     * - Resets UI state to Idle
+     */
+    fun endSession() {
+        try {
+            // Stop any local playback instantly
+            audioManager.stopPlayback()
+            isAssistantSpeaking = false
+            
+            // Clear any pending input buffer and cancel server-side response in progress
+            realtimeClient?.clearInputBuffer()
+            realtimeClient?.cancelResponse()
+            
+            // Disconnect websocket session
+            realtimeClient?.disconnect()
+            realtimeClient = null
+            
+            // Reset UI
+            updateState(sessionState = SessionState.Idle)
+            addDebugLog(DebugLogType.CONNECTION, "Sessione terminata dall'utente")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error ending session", e)
+            updateState(errorMessage = "Errore durante la chiusura sessione: ${e.message}")
+        }
     }
     
     override fun onCleared() {

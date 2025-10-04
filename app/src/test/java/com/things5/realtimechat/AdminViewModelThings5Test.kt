@@ -6,13 +6,22 @@ import com.things5.realtimechat.data.Things5Config
 import com.things5.realtimechat.data.Things5ConnectionStatus
 import com.things5.realtimechat.viewmodel.AdminViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.withTimeout
 import org.junit.Before
+import org.junit.After
 import org.junit.Test
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Tests for AdminViewModel Things5 integration functionality
@@ -26,20 +35,28 @@ import org.robolectric.RobolectricTestRunner
  */
 @ExperimentalCoroutinesApi
 @RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE)
 class AdminViewModelThings5Test {
     
     private lateinit var viewModel: AdminViewModel
     private lateinit var application: Application
+    private val testDispatcher = UnconfinedTestDispatcher()
     
     @Before
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         application = ApplicationProvider.getApplicationContext()
         viewModel = AdminViewModel(application)
     }
     
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+    
     @Test
     fun `test initial Things5 configuration`() = runTest {
-        val settings = viewModel.settings.first()
+        val settings = withTimeout(5000) { viewModel.settings.first() }
         val things5Config = settings.things5Config
         
         // Should start with default configuration
@@ -57,7 +74,7 @@ class AdminViewModelThings5Test {
         
         viewModel.updateThings5Credentials(testUsername, testPassword)
         
-        val settings = viewModel.settings.first()
+        val settings = withTimeout(5000) { viewModel.settings.first() }
         val things5Config = settings.things5Config
         
         assertEquals(testUsername, things5Config.username)
@@ -67,17 +84,17 @@ class AdminViewModelThings5Test {
     @Test
     fun `test toggle Things5 integration`() = runTest {
         // Initially disabled
-        var settings = viewModel.settings.first()
+        var settings = withTimeout(5000) { viewModel.settings.first() }
         assertFalse(settings.things5Config.enabled)
         
         // Toggle to enabled
         viewModel.toggleThings5Integration()
-        settings = viewModel.settings.first()
+        settings = withTimeout(5000) { viewModel.settings.first() }
         assertTrue(settings.things5Config.enabled)
         
         // Toggle back to disabled
         viewModel.toggleThings5Integration()
-        settings = viewModel.settings.first()
+        settings = withTimeout(5000) { viewModel.settings.first() }
         assertFalse(settings.things5Config.enabled)
     }
     
@@ -95,7 +112,7 @@ class AdminViewModelThings5Test {
         
         viewModel.updateThings5Config(newConfig)
         
-        val settings = viewModel.settings.first()
+        val settings = withTimeout(5000) { viewModel.settings.first() }
         val things5Config = settings.things5Config
         
         assertEquals(newConfig.enabled, things5Config.enabled)
@@ -135,7 +152,7 @@ class AdminViewModelThings5Test {
         viewModel.updateThings5Credentials("", "")
         viewModel.toggleThings5Integration()
         
-        val settings = viewModel.settings.first()
+        val settings = withTimeout(5000) { viewModel.settings.first() }
         
         // Should be enabled in UI but won't work functionally
         assertTrue(settings.things5Config.enabled)
@@ -154,6 +171,8 @@ class AdminViewModelThings5Test {
         
         // Save settings
         viewModel.saveSettings()
+        // Allow viewModelScope coroutines to run and DataStore to emit
+        advanceUntilIdle()
         
         // Verify state is maintained
         val settings = viewModel.settings.first()
@@ -167,7 +186,7 @@ class AdminViewModelThings5Test {
     @Test
     fun `test connection status flow`() = runTest {
         // Initial status should be DISCONNECTED
-        val initialStatus = viewModel.things5ConnectionStatus.first()
+        val initialStatus = withTimeout(5000) { viewModel.things5ConnectionStatus.first() }
         assertEquals(Things5ConnectionStatus.DISCONNECTED, initialStatus)
         
         // Note: In a real test environment, you would mock the network calls
@@ -192,8 +211,9 @@ class AdminViewModelThings5Test {
             )
             
             viewModel.updateThings5Config(config)
+            advanceUntilIdle()
             
-            val settings = viewModel.settings.first()
+            val settings = withTimeout(5000) { viewModel.settings.first() }
             assertEquals(serverUrl, settings.things5Config.serverUrl)
         }
     }
@@ -204,17 +224,17 @@ class AdminViewModelThings5Test {
         viewModel.updateThings5Credentials("test@example.com", "testpass")
         viewModel.toggleThings5Integration()
         
-        var settings = viewModel.settings.first()
+        var settings = withTimeout(5000) { viewModel.settings.first() }
         assertTrue(settings.things5Config.enabled)
         
         // Disable integration - should clear auth
         viewModel.toggleThings5Integration()
         
-        settings = viewModel.settings.first()
+        settings = withTimeout(5000) { viewModel.settings.first() }
         assertFalse(settings.things5Config.enabled)
         
         // Connection status should be reset to DISCONNECTED
-        val status = viewModel.things5ConnectionStatus.first()
+        val status = withTimeout(5000) { viewModel.things5ConnectionStatus.first() }
         assertEquals(Things5ConnectionStatus.DISCONNECTED, status)
     }
     
@@ -229,7 +249,7 @@ class AdminViewModelThings5Test {
         credentials.forEach { (username, password) ->
             viewModel.updateThings5Credentials(username, password)
             
-            val settings = viewModel.settings.first()
+            val settings = withTimeout(5000) { viewModel.settings.first() }
             val things5Config = settings.things5Config
             
             assertEquals(username, things5Config.username)
@@ -239,12 +259,12 @@ class AdminViewModelThings5Test {
     
     @Test
     fun `test Things5 config immutability`() = runTest {
-        val originalConfig = viewModel.settings.first().things5Config
+        val originalConfig = withTimeout(5000) { viewModel.settings.first() }.things5Config
         
         // Update credentials
         viewModel.updateThings5Credentials("new@user.com", "newpass")
         
-        val updatedSettings = viewModel.settings.first()
+        val updatedSettings = withTimeout(5000) { viewModel.settings.first() }
         val updatedConfig = updatedSettings.things5Config
         
         // Original config should be unchanged (immutable)

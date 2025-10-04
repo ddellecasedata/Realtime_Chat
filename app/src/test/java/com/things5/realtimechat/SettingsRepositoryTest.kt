@@ -7,6 +7,7 @@ import com.things5.realtimechat.data.McpServerConfig
 import com.things5.realtimechat.data.SettingsRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -48,7 +49,7 @@ class SettingsRepositoryTest {
         
         // When
         repository.saveSettings(testSettings)
-        val loadedSettings = repository.settingsFlow.first()
+        val loadedSettings = withTimeout(5000) { repository.settingsFlow.first() }
         
         // Then
         assertEquals(testSettings.openAiApiKey, loadedSettings.openAiApiKey)
@@ -63,7 +64,7 @@ class SettingsRepositoryTest {
         
         // When
         repository.addMcpServer(newServer)
-        val settings = repository.settingsFlow.first()
+        val settings = withTimeout(5000) { repository.settingsFlow.first() }
         
         // Then
         assertTrue(settings.mcpServers.any { it.name == "TestServer" })
@@ -77,7 +78,7 @@ class SettingsRepositoryTest {
         
         // When
         repository.removeMcpServer("ToRemove")
-        val settings = repository.settingsFlow.first()
+        val settings = withTimeout(5000) { repository.settingsFlow.first() }
         
         // Then
         assertFalse(settings.mcpServers.any { it.name == "ToRemove" })
@@ -90,7 +91,7 @@ class SettingsRepositoryTest {
         
         // When
         repository.updateApiKey(newApiKey)
-        val settings = repository.settingsFlow.first()
+        val settings = withTimeout(5000) { repository.settingsFlow.first() }
         
         // Then
         assertEquals(newApiKey, settings.openAiApiKey)
@@ -100,7 +101,7 @@ class SettingsRepositoryTest {
     fun `test set configured flag`() = runBlocking {
         // When
         repository.setConfigured(true)
-        val settings = repository.settingsFlow.first()
+        val settings = withTimeout(5000) { repository.settingsFlow.first() }
         
         // Then
         assertTrue(settings.isConfigured)

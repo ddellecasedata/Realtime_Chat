@@ -72,6 +72,11 @@ fun MainScreen(
                 actions = {
                     // Clear conversation button (only when connected)
                     if (uiState.sessionState is SessionState.Connected) {
+                        // Stop session immediately
+                        IconButton(onClick = { viewModel.endSession() }) {
+                            Icon(Icons.Default.Stop, "Termina Sessione")
+                        }
+                        
                         IconButton(
                             onClick = { viewModel.clearConversation() },
                             enabled = uiState.transcript.isNotEmpty() || uiState.capturedImages.isNotEmpty()
