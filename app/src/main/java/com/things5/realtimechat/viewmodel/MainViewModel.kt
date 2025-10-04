@@ -151,6 +151,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             - Then immediately call the appropriate tool.
             - Use the tool description to understand when to use it.
             
+            ## ⚠️ CRITICAL: Avoid ERROR -32602 "Invalid arguments"
+            
+            **Most common mistake**: Calling tools WITHOUT required parameters!
+            - ❌ `device_firmware_detail()` without machine_id → ERROR -32602
+            - ❌ `machine_command_execute()` without device_id or machine_command_id → ERROR -32602
+            - ❌ `metrics_read()` without device_id → ERROR -32602
+            
+            **Solution**: ALWAYS get IDs first from `list_machines`, then pass them to other tools!
+            
             ## Critical Tool Usage Patterns & Workflows
             
             ### 🔍 FINDING DEVICES (always do this first!)
@@ -168,10 +177,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             - Use `include_machine_model=true` for model details
             - Use `include_machines_group=true` for group details
             
-            **Tool**: `device_firmware_detail` (MOST IMPORTANT!)
-            - Requires: device_id (called machine_id in this tool)
-            - Use `include_machine_commands=true` to see available commands
-            - Use `include_machine_variables=true` to see metrics/parameters/states/events
+            **Tool**: `device_firmware_detail` (⭐ MOST IMPORTANT!)
+            - ⚠️ **REQUIRED PARAMETER**: `machine_id` (string, UUID) - NEVER call without it!
+            - This machine_id is the device_id you got from `list_machines`
+            - If you call without machine_id → ERROR -32602: "Required" 
+            - Optional: `include_machine_commands=true` to see available commands
+            - Optional: `include_machine_variables=true` to see metrics/parameters/states/events
             - **ALWAYS call this before**: executing commands, reading metrics, reading parameters
             - This tells you what's available on the device!
             
@@ -182,8 +193,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             3. `machine_command_execute` with device_id + machine_command_id
             
             **Tool**: `machine_command_execute`
-            - Requires: device_id AND machine_command_id (UUID from step 2)
-            - Optional: parameters array to override default command parameters
+            - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines) AND `machine_command_id` (UUID from device_firmware_detail)
+            - Optional: `parameters` array to override default command parameters
+            - If you call without these IDs → ERROR -32602
             - **Example**: User says "avvia cleaning" → find device → get commands → execute with cleaning command_id
             
             **Alternative Tool**: `perform_action`
@@ -194,33 +206,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             **For Metrics** (temperatures, counters, production data):
             - Tool: `metrics_read` or `aggregated_metrics` (for multiple devices)
-            - Requires: device_id
+            - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines)
             - Optional: from/to (ISO8601 dates), metric_names array, last_value=true for latest only
-            - **Must know metric names first**: call `device_firmware_detail` with include_machine_variables=true
+            - **Must know metric names first**: call `device_firmware_detail` with machine_id + include_machine_variables=true
+            - Without device_id → ERROR -32602
             
             **For Parameters** (device settings/configuration):
             - Tool: `read_parameters` for all parameters OR `read_single_parameter` for one by label
-            - Requires: device_id
+            - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines)
             - Optional: parameter_name_list array to filter specific parameters
-            - **Must know parameter names first**: call `device_firmware_detail` with include_machine_variables=true
+            - **Must know parameter names first**: call `device_firmware_detail` with machine_id + include_machine_variables=true
+            - Without device_id → ERROR -32602
             
             **For States** (current device state):
             - Tool: `states_read` for time series OR `state_read_last_value` for current value
-            - Requires: device_id
+            - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines)
             - Optional: from/to dates, states_names array
-            - **Must know state names first**: call `device_firmware_detail` with include_machine_variables=true
+            - **Must know state names first**: call `device_firmware_detail` with machine_id + include_machine_variables=true
+            - Without device_id → ERROR -32602
             
             **For Events/Alarms**:
             - Tool: `events_read` for specific device OR `overview_alarms`/`overview_events` for multiple devices
-            - Requires: device_id
+            - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines)
             - Optional: from/to dates, event_names array
-            - **Must know event names first**: call `device_firmware_detail` with include_machine_variables=true
+            - **Must know event names first**: call `device_firmware_detail` with machine_id + include_machine_variables=true
+            - Without device_id → ERROR -32602
             
             ### 🍽️ RECIPES (device programs)
             **Tool**: `device_managed_recipes`
-            - Requires: device_id (called machine_id)
+            - ⚠️ **REQUIRED**: `machine_id` (UUID - this is device_id from list_machines)
             - Returns list of recipes available on the device
             - Use before starting a recipe via command
+            - Without machine_id → ERROR -32602
             
             ### 👥 USER MANAGEMENT
             **Listing users**: `users_list`
