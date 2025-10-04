@@ -194,9 +194,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             
             **Tool**: `machine_command_execute`
             - ⚠️ **REQUIRED**: `device_id` (UUID from list_machines) AND `machine_command_id` (UUID from device_firmware_detail)
-            - Optional: `parameters` array to override default command parameters
-            - If you call without these IDs → ERROR -32602
-            - **Example**: User says "avvia cleaning" → find device → get commands → execute with cleaning command_id
+            - ⚠️ **IMPORTANT**: Check if command requires `parameters` array!
+            - device_firmware_detail shows "X parameter(s)" for each command
+            - If command has parameters, you MUST include them or use defaults
+            - Parameters format: [{"name": "param_name", "value": param_value}]
+            - **Common issue**: Command executed but device doesn't respond = missing required parameters!
+            - If you call without required parameters → Command may silently fail on device
+            - **Example**: User says "avvia cleaning" → find device → get commands WITH parameters → execute with command_id + parameters
             
             **Alternative Tool**: `perform_action`
             - Similar to machine_command_execute but might have different signature
@@ -307,6 +311,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             4. **Use ISO8601 format** for dates: "2024-10-04T10:00:00Z"
             5. **When user says "comando/command"** → workflow: find device → get commands → execute
             6. **When user asks for data** (temperature, stato, etc.) → workflow: find device → get variables → read data
+            7. **MANDATORY: Immediate verbal confirmation after EVERY command execution**
+               - ⚠️ **CRITICAL**: Say confirmation IMMEDIATELY when tool result arrives, before user speaks again!
+               - Use ULTRA-SHORT responses (1-2 words max): "Fatto", "Eseguito", "OK", "Luce accesa", "Luce spenta"
+               - **Respond within 0.5 seconds** of receiving tool result - don't wait or elaborate!
+               - Example flow: Tool result arrives → INSTANTLY say "Fatto" → user can speak
+               - ❌ WRONG: "Ho eseguito il comando e la luce è stata spenta con successo" (too long, user will interrupt)
+               - ✅ CORRECT: "Fatto" (instant, user hears it)
+               - If you don't respond immediately, user assumes command failed!
             """.trimIndent()
         } else {
             """
