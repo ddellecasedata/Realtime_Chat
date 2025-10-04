@@ -237,12 +237,21 @@ class RealtimeClient(
             session["turn_detection"] = it 
             Log.d(TAG, "🎯 Turn detection configured: $it")
         }
-        tools?.let { 
-            session["tools"] = it 
-            Log.d(TAG, "🔧 Tools configured: ${it.size} tools")
+        
+        if (tools != null) {
+            session["tools"] = tools
+            Log.d(TAG, "=".repeat(60))
+            Log.d(TAG, "🔧 TOOLS BEING SENT TO OPENAI:")
+            Log.d(TAG, "   Count: ${tools.size}")
+            tools.forEachIndexed { index, tool ->
+                Log.d(TAG, "   [$index] ${tool["name"]} (${tool["type"]})")
+            }
+            Log.d(TAG, "=".repeat(60))
+        } else {
+            Log.w(TAG, "⚠️ NO TOOLS being sent to OpenAI (tools is null)")
         }
         
-        Log.d(TAG, "⚙️ Sending session.update event")
+        Log.d(TAG, "⚙️ Sending session.update event with ${tools?.size ?: 0} tools")
         sendEvent(event)
     }
     
@@ -384,8 +393,20 @@ class RealtimeClient(
             val eventType = event["type"] ?: "unknown"
             val json = gson.toJson(event)
             Log.d(TAG, "📤 Sending event type: $eventType")
+            Log.d(TAG, "   JSON length: ${json.length} bytes")
+            
+            // Special logging for session.update to see tools
+            if (eventType == "session.update") {
+                val session = event["session"] as? Map<*, *>
+                val tools = session?.get("tools") as? List<*>
+                Log.d(TAG, "   Session.update contains ${tools?.size ?: 0} tools")
+                Log.d(TAG, "   JSON preview: ${json.take(500)}...")
+            }
+            
             Log.v(TAG, "Event JSON: $json")
             webSocket?.send(json)
+            
+            Log.d(TAG, "✅ Event sent successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error sending event", e)
             scope.launch {

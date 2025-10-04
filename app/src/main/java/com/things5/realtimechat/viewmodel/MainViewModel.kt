@@ -295,9 +295,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 if (tools.isNullOrEmpty()) {
                     Log.w(TAG, "⚠️ No MCP tools available after ${maxAttempts}s")
+                    Log.w(TAG, "⚠️ Realtime API will have NO TOOLS")
                 } else {
                     Log.d(TAG, "✅ Total tools available: ${tools.size}")
+                    Log.d(TAG, "=".repeat(60))
+                    Log.d(TAG, "📤 SENDING TOOLS TO REALTIME API:")
+                    Log.d(TAG, "=".repeat(60))
+                    tools.forEachIndexed { index, tool ->
+                        Log.d(TAG, "  [$index] ${tool["name"]}")
+                        Log.d(TAG, "      Type: ${tool["type"]}")
+                        Log.d(TAG, "      Description: ${tool["description"]}")
+                        val params = tool["parameters"]
+                        if (params != null) {
+                            Log.d(TAG, "      Parameters: ${params.toString().take(200)}")
+                        }
+                    }
+                    Log.d(TAG, "=".repeat(60))
                 }
+                
+                Log.d(TAG, "🔄 Calling realtimeClient.updateSession()...")
+                Log.d(TAG, "   Tools count: ${tools?.size ?: 0}")
+                Log.d(TAG, "   Tools is null: ${tools == null}")
                 
                 // Configure session usando semantic_vad per interruzioni naturali
                 // Seguendo le best practices per prompting realtime models
@@ -309,6 +327,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ),
                     tools = tools
                 )
+                
+                Log.d(TAG, "✅ updateSession() called with ${tools?.size ?: 0} tools")
                 
                 // Initialize audio playback
                 val playbackInit = audioManager.initPlayback()
