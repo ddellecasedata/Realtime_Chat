@@ -204,6 +204,7 @@ fun AdminScreen(
                     onTogglePasswordVisibility = { showThings5Password = !showThings5Password },
                     onToggleEnabled = { viewModel.toggleThings5Integration() },
                     onTestConnection = { viewModel.testThings5Connection() },
+                    onManageTools = { onNavigateToMcpTools("Things5 Integration") },
                     onStatusDescription = { status -> viewModel.getThings5StatusDescription(status) }
                 )
             }
@@ -636,6 +637,7 @@ fun Things5IntegrationCard(
     onTogglePasswordVisibility: () -> Unit,
     onToggleEnabled: () -> Unit,
     onTestConnection: () -> Unit,
+    onManageTools: () -> Unit,
     onStatusDescription: (Things5ConnectionStatus) -> String
 ) {
     Card(
@@ -804,6 +806,22 @@ fun Things5IntegrationCard(
                                 else -> "🔗 Testa connessione"
                             }
                         )
+                    }
+                }
+                
+                // Manage Tools Button (only if connected)
+                if (connectionStatus == Things5ConnectionStatus.CONNECTED) {
+                    OutlinedButton(
+                        onClick = onManageTools,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = "Gestisci tool",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Gestisci Tool Things5")
                     }
                 }
                 
