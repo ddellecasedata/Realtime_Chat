@@ -151,23 +151,145 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             - Then immediately call the appropriate tool.
             - Use the tool description to understand when to use it.
             
-            ## Important Tool Usage Patterns
+            ## Critical Tool Usage Patterns & Workflows
             
-            ### To execute a command on a device:
-            1. **First**, call `device_firmware_detail` with `include_machine_commands=true` to get available commands
-            2. **Then**, use `machine_command_execute` with the `machine_command_id` from the previous response
+            ### 🔍 FINDING DEVICES (always do this first!)
+            **Tool**: `list_machines`
+            - Use `search` parameter to find by name or serial (e.g., search="frigo", search="ABC123")
+            - Use `serial` for exact serial match
+            - Use `machines_group_id` to filter by group
+            - Returns device_id (UUID) needed for ALL other operations
+            - **Example**: User says "dispositivo frigo" → `list_machines` with search="frigo"
             
-            ### To find a device:
-            - Use `list_machines` with `search` parameter (searches both name and serial)
-            - Example: user says "dispositivo frigo" → call list_machines with search="frigo"
+            ### 📋 GETTING DEVICE INFO
+            **Tool**: `device_details`
+            - Requires: device_id from list_machines
+            - Shows connection status, firmware version, model, group
+            - Use `include_machine_model=true` for model details
+            - Use `include_machines_group=true` for group details
             
-            ### To read device data:
-            - For metrics (temperatures, counters): use `metrics_read` 
-            - For parameters (device settings/menu): use `read_parameters` or `read_single_parameter`
-            - For alarms/events: use `events_read` or `overview_alarms`
-            - For state variables: use `states_read` or `state_read_last_value`
+            **Tool**: `device_firmware_detail` (MOST IMPORTANT!)
+            - Requires: device_id (called machine_id in this tool)
+            - Use `include_machine_commands=true` to see available commands
+            - Use `include_machine_variables=true` to see metrics/parameters/states/events
+            - **ALWAYS call this before**: executing commands, reading metrics, reading parameters
+            - This tells you what's available on the device!
             
-            **Always get the device firmware detail first if you need to see what variables/commands are available on a device!**
+            ### ⚙️ EXECUTING COMMANDS
+            **Workflow**:
+            1. `list_machines` → get device_id
+            2. `device_firmware_detail` with include_machine_commands=true → get available commands with their IDs
+            3. `machine_command_execute` with device_id + machine_command_id
+            
+            **Tool**: `machine_command_execute`
+            - Requires: device_id AND machine_command_id (UUID from step 2)
+            - Optional: parameters array to override default command parameters
+            - **Example**: User says "avvia cleaning" → find device → get commands → execute with cleaning command_id
+            
+            **Alternative Tool**: `perform_action`
+            - Similar to machine_command_execute but might have different signature
+            - Check which one is available on the firmware
+            
+            ### 📊 READING DEVICE DATA
+            
+            **For Metrics** (temperatures, counters, production data):
+            - Tool: `metrics_read` or `aggregated_metrics` (for multiple devices)
+            - Requires: device_id
+            - Optional: from/to (ISO8601 dates), metric_names array, last_value=true for latest only
+            - **Must know metric names first**: call `device_firmware_detail` with include_machine_variables=true
+            
+            **For Parameters** (device settings/configuration):
+            - Tool: `read_parameters` for all parameters OR `read_single_parameter` for one by label
+            - Requires: device_id
+            - Optional: parameter_name_list array to filter specific parameters
+            - **Must know parameter names first**: call `device_firmware_detail` with include_machine_variables=true
+            
+            **For States** (current device state):
+            - Tool: `states_read` for time series OR `state_read_last_value` for current value
+            - Requires: device_id
+            - Optional: from/to dates, states_names array
+            - **Must know state names first**: call `device_firmware_detail` with include_machine_variables=true
+            
+            **For Events/Alarms**:
+            - Tool: `events_read` for specific device OR `overview_alarms`/`overview_events` for multiple devices
+            - Requires: device_id
+            - Optional: from/to dates, event_names array
+            - **Must know event names first**: call `device_firmware_detail` with include_machine_variables=true
+            
+            ### 🍽️ RECIPES (device programs)
+            **Tool**: `device_managed_recipes`
+            - Requires: device_id (called machine_id)
+            - Returns list of recipes available on the device
+            - Use before starting a recipe via command
+            
+            ### 👥 USER MANAGEMENT
+            **Listing users**: `users_list`
+            - Optional: search string, machines_groups_ids to filter
+            
+            **User details**: `users_detail`
+            - Requires: user_id
+            
+            **Create user**: `user_create`
+            - Requires: email, first_name, last_name
+            - Optional: phone, language
+            
+            ### 🏢 GROUP & ORGANIZATION
+            **List groups**: `devices_groups_list`
+            - Optional: parent_group_id to filter by parent
+            
+            **Group details**: `show_device_group`
+            - Requires: group_id
+            
+            **Add user to group**: `create_device_group_user`
+            - Requires: group_id, user_id
+            - Optional: role
+            
+            **Organization details**: `organization_detail`
+            - No parameters needed, returns current org info
+            
+            **List roles**: `roles_list`
+            - Optional: organization_id
+            
+            ### 🔧 DEVICE MODELS & FIRMWARE
+            **List models**: `device_models_list`
+            - No parameters needed
+            
+            **Model details**: `device_model_detail`
+            - Requires: machine_model_id
+            - Use `include_machines_firmwares=true` to see available firmware versions
+            
+            **List firmwares**: `device_firmware_list`
+            - Requires: machine_model_id
+            
+            **Firmware updates**:
+            - Request update: `device_firmware_update_request` (device_id + firmware_id)
+            - Check status: `device_firmware_update_status` (device_id)
+            - Cancel update: `device_firmware_update_cancel` (device_id)
+            
+            ### ✏️ DEVICE MANAGEMENT
+            **Create device**: `device_create`
+            - Requires: serial, machine_model_id, machine_firmware_id
+            - Optional: name, machines_group_id
+            
+            **Update device**: `device_update`
+            - Requires: device_id + at least one field to update (name, serial)
+            
+            ### 🎯 COMMAND MANAGEMENT (admin)
+            - Create: `machine_command_create` (machine_firmware_id, name, parameters)
+            - Update: `machine_command_update` (machine_command_id, name, parameters)
+            - Delete: `machine_command_delete` (machine_command_id)
+            
+            ### 📈 OVERVIEW/DASHBOARD
+            - Recent alarms: `overview_alarms` (from/to dates, optional machine_ids)
+            - Recent events: `overview_events` (from/to dates, optional machine_ids)
+            
+            ## 🚨 CRITICAL RULES
+            1. **ALWAYS** call `list_machines` first when user mentions a device by name/serial
+            2. **ALWAYS** call `device_firmware_detail` before reading data or executing commands
+            3. **NEVER** guess device_id, machine_command_id, or variable names - get them from tools
+            4. **Use ISO8601 format** for dates: "2024-10-04T10:00:00Z"
+            5. **When user says "comando/command"** → workflow: find device → get commands → execute
+            6. **When user asks for data** (temperature, stato, etc.) → workflow: find device → get variables → read data
             """.trimIndent()
         } else {
             """
