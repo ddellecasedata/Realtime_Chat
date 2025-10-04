@@ -150,6 +150,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
               - "Un attimo, cerco l'informazione."
             - Then immediately call the appropriate tool.
             - Use the tool description to understand when to use it.
+            
+            ## Important Tool Usage Patterns
+            
+            ### To execute a command on a device:
+            1. **First**, call `device_firmware_detail` with `include_machine_commands=true` to get available commands
+            2. **Then**, use `machine_command_execute` with the `machine_command_id` from the previous response
+            
+            ### To find a device:
+            - Use `list_machines` with `search` parameter (searches both name and serial)
+            - Example: user says "dispositivo frigo" → call list_machines with search="frigo"
+            
+            ### To read device data:
+            - For metrics (temperatures, counters): use `metrics_read` 
+            - For parameters (device settings/menu): use `read_parameters` or `read_single_parameter`
+            - For alarms/events: use `events_read` or `overview_alarms`
+            - For state variables: use `states_read` or `state_read_last_value`
+            
+            **Always get the device firmware detail first if you need to see what variables/commands are available on a device!**
             """.trimIndent()
         } else {
             """
