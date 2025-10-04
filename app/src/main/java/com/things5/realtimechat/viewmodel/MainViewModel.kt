@@ -39,6 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var mcpBridge: McpBridge? = null
     private var isAssistantSpeaking = false
     private val things5AuthService = Things5AuthService()
+    private var mcpObserversInitialized = false
     
     init {
         // Initialize Things5 authentication at startup if enabled
@@ -205,7 +206,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             settingsRepository.settingsFlow.collect { settings ->
                 _settings.value = settings
+                
+                // Pre-initialize MCP Bridge if there are configured servers (including Things5)
+                // This loads tools in background even before starting a Realtime session
+                val allServers = buildMcpServerList(settings)
+                if (allServers.isNotEmpty() && mcpBridge == null) {
+                    Log.d(TAG, "🔄 Pre-initializing MCP Bridge with ${allServers.size} servers")
+                    initializeMcpBridgeBackground(allServers, settings.mcpToolsConfig)
+                }
             }
+        }
+    }
+    
+    /**
+     * Initialize MCP Bridge in background to pre-load tools
+     */
+    private fun initializeMcpBridgeBackground(servers: List<McpServerConfig>, toolsConfig: com.things5.realtimechat.data.McpToolsConfiguration) {
+        try {
+            mcpBridge = McpBridge(
+                servers = servers,
+                onToolResult = { _, _ -> 
+                    // No-op in background mode
+                },
+                onError = { error ->
+                    Log.e(TAG, "MCP Bridge background error: $error")
+                },
+                onLog = { type, message, details ->
+                    addDebugLog(type, message, details)
+                }
+            )
+            
+            // Apply tool configuration
+            mcpBridge?.setToolsConfiguration(toolsConfig)
+            
+            // Connect to servers to load tools
+            mcpBridge?.connectToServers()
+            
+            // Initialize observers only once
+            if (!mcpObserversInitialized) {
+                // Observe MCP server status
+                observeMcpStatus()
+                
+                // Observe tool configuration changes
+                observeToolConfigChanges()
+                
+                mcpObserversInitialized = true
+            }
+            
+            Log.d(TAG, "✅ MCP Bridge pre-initialized in background")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error pre-initializing MCP Bridge", e)
         }
     }
     
@@ -475,9 +525,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     /**
      * Initialize MCP Bridge and connect to servers
+     * Called when Realtime session starts - reuses existing bridge or creates new one
      */
     private fun initializeMcpBridge(servers: List<McpServerConfig>) {
         try {
+            // If bridge already exists (from background init), just reconnect with new callback
+            // Otherwise create a new one
+            if (mcpBridge != null) {
+                Log.d(TAG, "♻️ Reusing existing MCP Bridge for Realtime session")
+                // Bridge already connected and has tools loaded
+                // The background bridge will continue to work, but we need to recreate it
+                // with the Realtime callback for tool results
+            }
+            
+            // Disconnect old bridge if exists
+            mcpBridge?.disconnect()
+            
             mcpBridge = McpBridge(
                 servers = servers,
                 onToolResult = { callId, result ->
@@ -510,13 +573,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Connetti ai server MCP
             mcpBridge?.connectToServers()
             
-            // Observe MCP server status
-            observeMcpStatus()
+            // Initialize observers only once
+            if (!mcpObserversInitialized) {
+                observeMcpStatus()
+                observeToolConfigChanges()
+                mcpObserversInitialized = true
+            }
             
-            // Observe tool configuration changes
-            observeToolConfigChanges()
-            
-            Log.d(TAG, "MCP Bridge initialized")
+            Log.d(TAG, "MCP Bridge initialized for Realtime session")
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing MCP Bridge", e)
             updateState(errorMessage = "Errore MCP: ${e.message}")
@@ -621,7 +685,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         kotlinx.coroutines.delay(100)
                         updateState(isSendingAudio = false)
                     }
-                    Log.d(TAG, "✅ Total audio chunks sent: $chunkCount")
+                    // Flow ends when recording stops
                 }
             } else {
                 updateState(errorMessage = "Impossibile avviare la registrazione audio")

@@ -59,11 +59,9 @@ fun AdminScreen(
     var things5ServerUrl by remember { mutableStateOf("") }
     var showThings5Password by remember { mutableStateOf(false) }
     
-    LaunchedEffect(settings.openAiApiKey) {
+    // Initialize values only once when screen is first composed
+    LaunchedEffect(Unit) {
         apiKey = settings.openAiApiKey
-    }
-    
-    LaunchedEffect(settings.things5Config) {
         things5Username = settings.things5Config.username
         things5Password = settings.things5Config.password
         things5ServerUrl = settings.things5Config.serverUrl
