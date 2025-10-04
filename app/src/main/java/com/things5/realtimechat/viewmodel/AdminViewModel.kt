@@ -172,6 +172,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 
                 if (status == Things5ConnectionStatus.CONNECTED) {
                     Log.d(TAG, "✅ Things5 connection test SUCCESSFUL")
+                    
+                    // Auto-save ALL settings to ensure Things5 config is persisted
+                    // This prevents losing configuration if app closes before manual save
+                    try {
+                        Log.d(TAG, "💾 Auto-saving all settings after successful Things5 connection...")
+                        settingsRepository.saveSettings(_settings.value)
+                        Log.d(TAG, "✅ Auto-save completed")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Auto-save failed", e)
+                    }
                 } else {
                     Log.w(TAG, "⚠️ Things5 connection test FAILED: $status")
                 }

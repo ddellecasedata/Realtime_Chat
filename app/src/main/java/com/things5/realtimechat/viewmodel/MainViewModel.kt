@@ -51,14 +51,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        // Observe settings changes and re-authenticate when Things5 config changes
+        // Observe settings changes and re-authenticate ONLY when credentials actually change
         viewModelScope.launch {
             var previousConfig: com.things5.realtimechat.data.Things5Config? = null
             settingsRepository.settingsFlow.collect { settings ->
-                if (previousConfig != null && previousConfig != settings.things5Config) {
-                    Log.d(TAG, "🔄 Things5 config changed, re-authenticating...")
+                val currentConfig = settings.things5Config
+                
+                // Only re-authenticate if credentials or URL actually changed
+                if (previousConfig != null && (
+                    previousConfig!!.username != currentConfig.username ||
+                    previousConfig!!.password != currentConfig.password ||
+                    previousConfig!!.serverUrl != currentConfig.serverUrl ||
+                    (previousConfig!!.enabled != currentConfig.enabled && currentConfig.enabled)
+                )) {
+                    Log.d(TAG, "🔄 Things5 credentials changed, re-authenticating...")
+                    Log.d(TAG, "   Username changed: ${previousConfig!!.username != currentConfig.username}")
+                    Log.d(TAG, "   Password changed: ${previousConfig!!.password != currentConfig.password}")
+                    Log.d(TAG, "   URL changed: ${previousConfig!!.serverUrl != currentConfig.serverUrl}")
+                    Log.d(TAG, "   Enabled toggled on: ${!previousConfig!!.enabled && currentConfig.enabled}")
                     initializeThings5Authentication(settings)
+                } else if (previousConfig != null) {
+                    Log.d(TAG, "⏭️  Things5 config updated but credentials unchanged, skipping re-auth")
                 }
+                
                 previousConfig = settings.things5Config
             }
         }
