@@ -62,17 +62,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 previousConfig = settings.things5Config
             }
         }
-        
-        // Observe Things5 connection status and pre-load tools when connected
-        viewModelScope.launch {
-            things5AuthService.connectionStatus.collect { status ->
-                if (status == Things5ConnectionStatus.CONNECTED) {
-                    Log.d(TAG, "✅ Things5 connected, pre-loading MCP tools...")
-                    kotlinx.coroutines.delay(500) // Small delay to ensure token is saved
-                    preloadMcpTools()
-                }
-            }
-        }
     }
     
     /**
@@ -177,7 +166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             # Instructions
             - Be natural and conversational.
             - If interrupted, stop speaking immediately.
-            - Use tools when appropriate to help the user.
+            - ALWAYS check tools before answering. Data for answering questions is provided by tools. 
             - Confirm before taking any destructive actions.
             - Keep conversations efficient and helpful.
             
@@ -887,42 +876,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun getMcpBridge(): McpBridge? {
         return mcpBridge
-    }
-    
-    /**
-     * Pre-load MCP tools (called after Things5 connection test)
-     */
-    fun preloadMcpTools() {
-        viewModelScope.launch {
-            try {
-                val currentSettings = settingsRepository.settingsFlow.first()
-                val allServers = buildMcpServerList(currentSettings)
-                
-                if (allServers.isNotEmpty() && mcpBridge == null) {
-                    Log.d(TAG, "🔄 Pre-loading MCP tools for ${allServers.size} servers")
-                    
-                    // Create a temporary bridge just for tool discovery
-                    val tempBridge = McpBridge(
-                        servers = allServers,
-                        onToolResult = { _, _ -> /* no-op */ },
-                        onError = { error -> Log.e(TAG, "Pre-load MCP error: $error") },
-                        onLog = { type, message, details -> addDebugLog(type, message, details) }
-                    )
-                    
-                    tempBridge.setToolsConfiguration(currentSettings.mcpToolsConfig)
-                    tempBridge.connectToServers()
-                    
-                    // Store for later use
-                    mcpBridge = tempBridge
-                    observeMcpStatus()
-                    observeToolConfigChanges()
-                    
-                    Log.d(TAG, "✅ MCP tools pre-loaded")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error pre-loading MCP tools", e)
-            }
-        }
     }
     
     /**
